@@ -1,0 +1,22 @@
+{
+    "name": "woodpeacker/dbwoodpeacker",
+    "description": "A simple and efficient PHP database table handler.",
+    "version": "2.0.0",
+    "type": "library",
+    "require": {
+        "php": ">=7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Woodpeacker\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Woodpeacker",
+            "email": "derkob.7@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "license": "MIT"
+}
