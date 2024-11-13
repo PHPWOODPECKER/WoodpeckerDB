@@ -11,8 +11,9 @@
 
 To install the library, use Composer:
 
-```bash
 composer require woodpeacker/dbwoodpeacker
+
+```bash
 نحوه استفاده
 راه‌اندازی
 برای استفاده از کتابخانه، ابتدا باید یک شیء از کلاس DatabaseTable ایجاد کنید:
@@ -67,18 +68,3 @@ $dbTable->save([
 To delete a record:
 
 $dbTable->delete('column_name', 'value');
-مجوز
-این کتابخانه تحت مجوز MIT منتشر شده است.
-
-This library is released under the MIT License.
-
-مشارکت
-اگر می‌خواهید در توسعه این کتابخانه کمک کنید، خوشحال می‌شویم که همکاری کنید!
-
-If you would like to contribute to the development of this library, we would be happy to have your collaboration!
-
-
-### نکات پایانی
-- می‌توانید در صورت نیاز بخش‌های بیشتری به این فایل اضافه کنید، مانند مثال‌های بیشتر، نحوه مدیریت خطاها و ... .
-- اطمینان حاصل کنید که اطلاعات مربوط به نام کاربری و رمز عبور پایگاه داده را در مثال‌ها به درستی تنظیم کنید.
-- همچنین می‌توانید آیکون‌ها یا تصاویری برای جذاب‌تر کردن README اضافه کنید.
