@@ -1,302 +1,393 @@
 <?php
 
-// Developer and programmer: Woodpeacker
-// Version 2.0.0
+namespace DatabaseTable;
 
-class DatabaseTable {
+require_once("./Tool.php");
+require_once("./execption.php");
 
-    public function __construct(private \PDO $pdo, private string $table, private string $primaryKey) {
+class WDB {
+
+private static $pdo;
+private static $primaryKey;
+
+    /**
+     * Establishes a connection to the MySQL database.
+     *
+     * This function attempts to connect to the specified MySQL database using the given credentials.
+     * If the connection fails, an error message is displayed.
+     *
+     * @param string $host The host of the database server (e.g., localhost).
+     * @param string $dbname The name of the database to connect to.
+     * @param string $username The username for database authentication.
+     * @param string $password The password for database authentication.
+     * @param string $primaryKey The primary key for the database (used internally).
+     */
+    public static function connection(string $host, string $dbname, string $username, string $password, string $primaryKey): void {
+      self::$primaryKey = $primaryKey;
+        try {
+            self::$pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+            self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        } catch (PDOException $e) {
+            echo "Connection failed: " . $e->getMessage();
+        }
+    }
+    
+    /**
+     * Closes the current database connection.
+     *
+     * This function disconnects from the database by setting the PDO instance to null.
+     */
+    public static function disconnection(): void {
+        self::$pdo = null;
+    }
+
+    private static function prepareAndExecute(string $query, array $params = []): \PDOStatement {
+      try{
+        $stmt = self::$pdo->prepare($query);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(":$key", $value);
+        }
+        $stmt->execute();
+        return $stmt;
+      }catch (PDOException $e) {
+            throw new WDBException(" prepareAndExecute error: " . $e->getMessage());
+        }
     }
 
     /**
      * Selects specific fields from the table.
      * 
+     * @param string $table The table name.
      * @param string $field The field to select.
      * @return array An associative array of selected fields.
      * @throws Exception If there is an error during the select operation.
      */
-    public function select(string $field): array {
-        $field = $this->validateInput(['field' => $field])['field'];
-        $sql = "SELECT `$field` FROM `$this->table`";
+    public static function select(string $table, string $field): \Tool {
+        $table = self::validateInput(['table' => $table])['table'];
+        $field = self::validateInput(['field' => $field])['field'];
+        $sql = "SELECT `$field` FROM `$table`";
         try {
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute();
+            $stmt = self::prepareAndExecute($sql);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            throw new Exception("Select function error: " . $e->getMessage());
+            throw new WDBException("Select function error: " . $e->getMessage());
         }
     }
 
     /**
      * Finds a single record by a specific field and value.
      * 
+     * @param string $table The table name.
      * @param string $field The field to search by.
      * @param string $value The value to search for.
      * @return array The found record as an associative array.
      * @throws Exception If there is an error during the find operation.
      */
-    public function find(string $field, string $value): array {
-        $field = $this->validateInput(['field' => $field])['field'];
-        $value = $this->validateInput(['value' => $value])['value'];
-        $query = "SELECT * FROM `$this->table` WHERE `$field` = :value";
+    public static function find(string $table, string $field, string $value): \Tool {
+        $table = self::validateInput(['table' => $table])['table'];
+        $field = self::validateInput(['field' => $field])['field'];
+        $value = self::validateInput(['value' => $value])['value'];
+        $query = "SELECT * FROM `$table` WHERE `$field` = :value";
         
         try {
-            $stmt = $this->pdo->prepare($query);
-            $stmt->bindValue(':value', $value, PDO::PARAM_STR);
-            $stmt->execute();
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            $stmt = self::prepareAndExecute($query, [':value' => $value]);
+            return new Tool(self::$pdo, $table, self::$primaryKey, $stmt->fetchAll(PDO::FETCH_ASSOC));
         } catch (PDOException $e) {
-            throw new Exception("Find function error: " . $e->getMessage());
+            throw new WDBException("Find function error: " . $e->getMessage());
         }
     }
 
-    /**
-     * Finds records based on multiple conditions using AND.
-     * 
-     * @param array $conditions An associative array of field-value pairs.
-     * @return array An array of found records.
-     * @throws Exception If there is an error during the find operation.
-     */
-    public function findWithAnd(array $conditions): array {
-        $where = [];
-        $params = [];
-        foreach ($conditions as $field => $value) {
-            $field = $this->validateInput(['field' => $field])['field'];
-            $value = $this->validateInput(['value' => $value])['value'];
-            $where[] = "`$field` = :$field";
-            $params[$field] = $value;
-        }
-        $query = "SELECT * FROM `$this->table` WHERE " . implode(' AND ', $where);
+/** * Finds records based on multiple conditions using AND or OR.
+* 
+* @param string $table The name of the table. 
+* @param boolean that specifies whether the AND or OR find is true or false
+* @param array $conditions An associative array of field-value pairs. 
+* 
+* return array @ an array of found records. 
+* throws an @ exception if there is an error during the Find operation. 
+*/
+public static function findWith(string $table, bool $with, array $conditions): \Tool{
+    $findtype = $with ? ' AND ' : ' OR ';
+    $table = self::validateInput(['table' => $table])['table'];
+    
+    $where = [];
+    $params = [];
+    
+    foreach ($conditions as $field => $value) {
+        $field = self::validateInput(['field' => $field])['field'];
+        $value = self::validateInput(['value' => $value])['value'];
         
-        try {
-            $stmt = $this->pdo->prepare($query);
-            $stmt->execute($params);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            throw new Exception("FindWithAnd function error: " . $e->getMessage());
-        }
+        $where[] = "`$field` = :$field";
+        $params["$field"] = $value;
     }
     
-    /**
-     * Finds records based on multiple conditions using OR.
-     * 
-     * @param array $conditions An associative array of field-value pairs.
-     * @return array An array of found records.
-     * @throws Exception If there is an error during the find operation.
-     */
-    public function findWithOr(array $conditions): array {
-        $where = [];
-        $params = [];
-        foreach ($conditions as $field => $value) {
-            $field = $this->validateInput(['field' => $field])['field'];
-            $value = $this->validateInput(['value' => $value])['value'];
-            $where[] = "`$field` = :$field";
-            $params[$field] = $value;
-        }
-        $query = "SELECT * FROM `$this->table` WHERE " . implode(' OR ', $where);
-
-        try {
-            $stmt = $this->pdo->prepare($query);
-            $stmt->execute($params);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            throw new Exception("FindWithOr function error: " . $e->getMessage());
-        }
+    if (count($where) === 0) {
+        throw new WDBException("No conditions provided for WHERE clause.");
     }
+    
+    $query = "SELECT * FROM `$table` WHERE " . implode($findtype, $where);
+    
 
+    try {
+        $stmt = self::prepareAndExecute($query, $params);
+        return new Tool(self::$pdo, $table, self::$primaryKey, $stmt->fetchAll(PDO::FETCH_ASSOC));
+    } catch (PDOException $e) {
+        throw new WDBException("FindWith function error: " . $e->getMessage());
+    }
+}
+    
     /**
      * Retrieves all records from the table.
      * 
+     * @param string $table The table name.
      * @return array An array of all records.
      * @throws Exception If there is an error during the getAll operation.
      */
-    public function getAll(): array {
+    public static function getAll(string $table): \Tool{
+        $table = self::validateInput(['table' => $table])['table'];
         try {
-            $stmt = $this->pdo->prepare("SELECT * FROM `$this->table`");
-            $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $stmt = self::prepareAndExecute("SELECT * FROM `$table`");
+            
+            return new Tool(self::$pdo, $table, self::$primaryKey, $stmt->fetchAll(PDO::FETCH_ASSOC));
         } catch (PDOException $e) {
-            throw new Exception("GetAll function error: " . $e->getMessage());
+            throw new WDBException("GetAll function error: " . $e->getMessage());
         }
     }
-    
+
     /**
      * Retrieves the last record based on the primary key.
      * 
+     * @param string $table The table name.
      * @return array The last record.
      * @throws Exception If there is an error during the getLast operation.
      */
-    public function getLast(): array {
-        $query = "SELECT * FROM `$this->table` ORDER BY `$this->primaryKey` DESC LIMIT 1";
+    public static function getLast(string $table): \Tool {
+        $table = self::validateInput(['table' => $table])['table'];
+        $primaryKey1 = self::$primaryKey;
+        $query = "SELECT * FROM `$table` ORDER BY `$primaryKey1` DESC LIMIT 1";
         try {
-            $stmt = $this->pdo->prepare($query);
-            $stmt->execute();
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            $stmt = self::prepareAndExecute($query);
+            
+            return new Tool(self::$pdo, $table, self::$primaryKey, $stmt->fetch(PDO::FETCH_ASSOC));
         } catch (PDOException $e) {
-            throw new Exception("GetLast function error: " . $e->getMessage());
+            throw new WDBException("GetLast function error: " . $e->getMessage());
         }
     }
-    
+
     /**
      * Retrieves the first record based on the primary key.
      * 
+     * @param string $table The table name.
      * @return array The first record.
      * @throws Exception If there is an error during the getFirst operation.
      */
-    public function getFirst(): array {
-        $query = "SELECT * FROM `$this->table` ORDER BY `$this->primaryKey` ASC LIMIT 1";
+    public static function getFirst(string $table): \Tool {
+        $table = self::validateInput(['table' => $table])['table'];
+        $primaryKey1 = self::$primaryKey;
+        $query = "SELECT * FROM `$table` ORDER BY `$primaryKey1` ASC LIMIT 1";
         try {
-            $stmt = $this->pdo->prepare($query);
-            $stmt->execute();
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            $stmt = self::prepareAndExecute($query);
+            
+            return new Tool(self::$pdo, $table, self::$primaryKey, $stmt->fetch(PDO::FETCH_ASSOC));
         } catch (PDOException $e) {
-            throw new Exception("GetFirst function error: " . $e->getMessage());
+            throw new WDBException("GetFirst function error: " . $e->getMessage());
         }
     }
   
     /**
-     * Retrieves a paginated list of records.
+     * Retrieves records from the specified table grouped by a specific field.
      * 
-     * @param int $limit The number of records to retrieve.
-     * @param int $offset The offset for the records.
-     * @return array An array of records.
-     * @throws Exception If there is an error during the getPaginated operation.
+     * This function selects the distinct values from the specified `$field` and counts how many records match each value.
+     * 
+     * @param string $table The name of the table to query.
+     * @param string $field The field to group by.
+     * @return array An array of grouped records with their respective counts.
+     * @throws Exception If there is an error during the query execution.
      */
-    public function getPaginated(int $limit, int $offset): array {
-        $query = "SELECT * FROM `$this->table` LIMIT :limit OFFSET :offset";
-        try {
-            $stmt = $this->pdo->prepare($query);
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-            $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            throw new Exception("GetPaginated function error: " . $e->getMessage());
+    public static function getGrouped(string $table, string $field): \Tool {
+        $table = self::validateInput(['table' => $table])['table'];
+        $field = self::validateInput(['field' => $field])['field'];
+      try{
+        $query = "SELECT `$field`, COUNT(*) as count FROM `$table` GROUP BY `$field`";
+        $stmt = self::prepareAndExecute($query);
+        
+        return new Tool(self::$pdo, $table, self::$primaryKey, $stmt->fetchAll(PDO::FETCH_ASSOC));
+      }catch (PDOException $e) {
+            throw new WDBException("GetGrouped function error: " . $e->getMessage());
         }
     }
+    
+    /**
+     * Retrieves a random record from the specified table.
+     * 
+     * This function selects a random record from the given table. The result is based on random ordering.
+     * 
+     * @param string $table The name of the table to query.
+     * @return array A random record from the table.
+     * @throws Exception If there is an error during the query execution.
+     */
+    public static function getRandom(string $table): \Tool {
+      $table = self::validateInput(['table' => $table])['table'];
+      try{
+        $query = "SELECT * FROM `$table` ORDER BY RAND() LIMIT 1";
+        $stmt = self::prepareAndExecute($query);
+        
+        return new Tool(self::$pdo, $table, self::$primaryKey, $stmt->fetch(PDO::FETCH_ASSOC));
+      }catch (PDOException $e) {
+            throw new WDBException("GetRandom function error: " . $e->getMessage());
+        }
+    }
+
 
     /**
      * Returns the total number of records in the table.
      * 
+     * @param string $table The table name.
      * @return int The total count of records.
      * @throws Exception If there is an error during the total operation.
      */
-    public function total(): int {
+    public static function total(string $table): int {
+        $table = self::validateInput(['table' => $table])['table'];
         try {
-            $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM `$this->table`");
-            $stmt->execute();
+            $stmt = self::prepareAndExecute("SELECT COUNT(*) FROM `$table`");
             return (int)$stmt->fetchColumn();
         } catch (PDOException $e) {
-            throw new Exception("Total function error: " . $e->getMessage());
+            throw new WDBException("Total function error: " . $e->getMessage());
         }
     }
 
     /**
      * Returns the total number of records that match a specific field and value.
      * 
+     * @param string $table The table name.
      * @param string $field The field to count by.
      * @param string $value The value to count for.
      * @return int The count of matching records.
      * @throws Exception If there is an error during the totalField operation.
      */
-    public function totalField(string $field, string $value): int {
-        $field = $this->validateInput(['field' => $field])['field'];
-        $value = $this->validateInput(['value' => $value])['value'];
-        $query = "SELECT COUNT(*) FROM `$this->table` WHERE `$field` = :value";
+    public static function totalField(string $table, string $field, string $value): int {
+        $table = self::validateInput(['table' => $table])['table'];
+        $field = self::validateInput(['field' => $field])['field'];
+        $value = self::validateInput(['value' => $value])['value'];
+        $query = "SELECT COUNT(*) FROM `$table` WHERE `$field` = :value";
         
         try {
-            $stmt = $this->pdo->prepare($query);
-            $stmt->bindValue(':value', $value, PDO::PARAM_STR);
-            $stmt->execute();
+            $stmt = self::prepareAndExecute($query, [':value' => $value]);
             return (int)$stmt->fetchColumn();
         } catch (PDOException $e) {
-            throw new Exception("TotalField function error: " . $e->getMessage());
+            throw new WDBException("TotalField function error: " . $e->getMessage());
         }
     }
 
     /**
      * Saves a record to the database, either inserting or updating based on the presence of the primary key.
      * 
+     * @param string $table The table name.
      * @param array $record The record data to save.
      * @throws Exception If there is an error during the save operation.
      */
-    public function save(array $record): void {
-        $record = $this->sanitizeInput($record);
-        $record = $this->validateInput($record);
+    public static function save(string $table, array $record): void {
+        $table = self::validateInput(['table' => $table])['table'];
+        $record = self::validateInput($record);
 
         try {
-            if (empty($record[$this->primaryKey])) {
-                $this->insert($record);
+            if (!isset($record[self::$primaryKey])) {
+                self::insert($table, $record);
             } else {
-                $this->update($record);
+                self::update($table, $record);
             }
         } catch (PDOException $e) {
-            throw new Exception("Save function error: " . $e->getMessage());
+            throw new WDBException("Save function error: " . $e->getMessage());
         }
     }
 
-    private function update(array $values): void {
-        $query = "UPDATE `$this->table` SET ";
+    private static function update(string $table, array $values): void {
+        $query = "UPDATE `$table` SET ";
         $query .= implode(', ', array_map(fn($key) => "`$key` = :$key", array_keys($values)));
-        $query .= " WHERE `$this->primaryKey` = :primaryKey";
+        $primaryKey1 = self::$primaryKey;
+        $query .= " WHERE `$primaryKey1` = :primaryKey";
 
-        $values['primaryKey'] = $values[$this->primaryKey];
+        $values['primaryKey'] = $values[self::$primaryKey];
 
         try {
-            $stmt = $this->pdo->prepare($query);
-            $stmt->execute($values);
+            $stmt = self::prepareAndExecute($query, $values);
         } catch (PDOException $e) {
-            throw new Exception("Update function error: " . $e->getMessage());
+            throw new WDBException("Update function error: " . $e->getMessage());
         }
     }
 
-    private function insert(array $values): void {
-        unset($values[$this->primaryKey]);
-        $query = "INSERT INTO `$this->table` (" . implode(', ', array_map(fn($key) => "`$key`", array_keys($values))) . ")";
+    private static function insert(string $table, array $values): void {
+        unset($values[self::$primaryKey]);
+        $query = "INSERT INTO `$table` (" . implode(', ', array_map(fn($key) => "`$key`", array_keys($values))) . ")";
         $query .= " VALUES (" . implode(', ', array_map(fn($key) => ":$key", array_keys($values))) . ")";
 
         try {
-            $stmt = $this->pdo->prepare($query);
-            $stmt->execute($values);
+            $stmt = self::prepareAndExecute($query, $values);
         } catch (PDOException $e) {
-            throw new Exception("Insert function error: " . $e->getMessage());
+            throw new WDBException("Insert function error: " . $e->getMessage());
+        }
+    }
+    
+  /**
+   * Updates a specific field in all records of the specified table.
+   * 
+   * This function sets the provided value for the specified field in every record of the table.
+   * 
+   * @param string $table The name of the table to update.
+   * @param string $field The field to update.
+   * @param mixed $value The value to set for the specified field.
+   * @return void
+   * @throws Exception If there is an error during the update operation.
+   */
+    public static function updateField(string $table, string $field, string $value): void {
+      $table = self::validateInput(['table' => $table])['table'];
+      $field = self::validateInput(['field' => $field])['field'];
+      $value = self::validateInput(['value' => $value])['value'];
+      try{
+        $query = "UPDATE `$table` SET `$field` = :value";
+        self::prepareAndExecute($query, [':value' => $value]);
+      }catch (PDOException $e) {
+            throw new WDBException("UpdateField function error: " . $e->getMessage());
         }
     }
 
     /**
      * Deletes a record from the table based on a specific field and value.
      * 
+     * @param string $table The table name.
      * @param string $field The field to delete by.
-     * @param string $value The value to delete for.
+     * @p aram string $value The value to delete for.
      * @throws Exception If there is an error during the delete operation.
      */
-    public function delete(string $field, string $value): void {
-        $field = $this->validateInput(['field' => $field])['field'];
-        $value = $this->validateInput(['value' => $value])['value'];
-        $query = "DELETE FROM `$this->table` WHERE `$field` = :value";
+    public static function delete(string $table, string $field, string $value): void {
+        $table = self::validateInput(['table' => $table])['table'];
+        $field = self::validateInput(['field' => $field])['field'];
+        $value = self::validateInput(['value' => $value])['value'];
+        $query = "DELETE FROM `$table` WHERE `$field` = :value";
         
         try {
-            $stmt = $this->pdo->prepare($query);
-            $stmt->bindValue(':value', $value, PDO::PARAM_STR);
-            $stmt->execute();
+            self::prepareAndExecute($query, [':value' => $value]);
         } catch (PDOException $e) {
-            throw new Exception("Delete function error: " . $e->getMessage());
+            throw new WDBException("Delete function error: " . $e->getMessage());
         }
     }
-
+    
     /**
-     * Sanitizes input data to prevent XSS attacks.
+     * Truncates the specified table, removing all records.
      * 
-     * @param array $input The input data to sanitize.
-     * @return array The sanitized input data.
+     * This function removes all records from the specified table, but does not remove the table itself.
+     * 
+     * @param string $table The name of the table to truncate.
+     * @return void
+     * @throws Exception If there is an error during the truncate operation.
      */
-    public function sanitizeInput(array $input): array {
-        foreach ($input as $key => $value) {
-            if (is_string($value)) {
-                $input[$key] = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-            }
+    public static function truncate(string $table): void {
+      $table = self::validateInput(['table' => $table])['table'];
+      try{
+        self::prepareAndExecute("TRUNCATE TABLE `$table`");
+      }catch (PDOException $e) {
+            throw new WDBException("Truncate function error: " . $e->getMessage());
         }
-        return $input;
     }
 
     /**
@@ -305,20 +396,18 @@ class DatabaseTable {
      * @param array $input The input data to validate.
      * @return array The validated input data.
      */
-    public function validateInput(array $input): array {
+    public static function validateInput(array $input): array {
         $validated = [];
         foreach ($input as $key => $value) {
             if (is_string($value)) {
-                $validated[$key] = filter_var($value, FILTER_SANITIZE_STRING);
+                $validated[$key] = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
             } elseif (is_int($value)) {
                 $validated[$key] = filter_var($value, FILTER_SANITIZE_NUMBER_INT);
             } elseif (filter_var($value, FILTER_VALIDATE_EMAIL)) {
                 $validated[$key] = filter_var($value, FILTER_SANITIZE_EMAIL);
             } elseif (filter_var($value, FILTER_VALIDATE_URL)) {
                 $validated[$key] = filter_var($value, FILTER_SANITIZE_URL);
-            } else {
-                $validated[$key] = $this->pdo->quote($value);
-            }
+            } 
         }
         return $validated;
     }
@@ -329,15 +418,16 @@ class DatabaseTable {
      * @param callable $callback A callable that contains the operations to perform.
      * @throws Exception If there is an error during the transaction.
      */
-    public function transaction(callable $callback): void {
+    public static function transaction(callable $callback): void {
         try {
-            $this->pdo->beginTransaction();
-            $callback($this);
-            $this->pdo->commit();
+            self::$pdo->beginTransaction();
+            $callback(self::class);
+            self::$pdo->commit();
         } catch (Exception $e) {
-            $this->pdo->rollBack();
-            throw new Exception("Transaction error: " . $e->getMessage());
+            self::$pdo->rollBack();
+            throw new WDBException("Transaction error: " . $e->getMessage());
         }
     }
 }
+
 ?>
