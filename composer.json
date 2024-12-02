@@ -1,7 +1,7 @@
 {
     "name": "woodpeacker/dbwoodpeacker",
     "description": "A simple and efficient PHP database table handler.",
-    "version": "2.0.0",
+    "version": "2.5.0",
     "type": "library",
     "require": {
         "php": ">=7.4"

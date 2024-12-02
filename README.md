@@ -9,9 +9,7 @@
 ## نصب
 برای نصب کتابخانه، از Composer استفاده کنید:
 
-To install the library, use Composer:
-
-composer require woodpeacker/dbwoodpeacker
+To install the library, use Composer: composer require woodpeacker/dbwoodpeacker
 
 ```bash
 نحوه استفاده
@@ -24,31 +22,27 @@ require 'vendor/autoload.php';
 
 use Woodpeacker\DatabaseTable;
 
-$pdo = new PDO('mysql:host=localhost;dbname=test_db', 'username', 'password');
-$table = 'your_table';
-$primaryKey = 'id';
-
-$dbTable = new DatabaseTable($pdo, $table, $primaryKey);
+DBW::connction('host', 'username', 'password', 'dbname', 'primarykey');
 انتخاب فیلد
 برای انتخاب یک فیلد خاص از جدول:
 
 To select a specific field from the table:
 
-$results = $dbTable->select('column_name');
-print_r($results);
+print_r(DBW::select('table_name', 'column_name')->getArray());
+
 پیدا کردن رکورد
 برای پیدا کردن یک رکورد با یک فیلد و مقدار خاص:
 
 To find a record by a specific field and value:
 
-$result = $dbTable->find('column_name', 'value');
-print_r($result);
+print_r(DBW::find('table_name', 'column_name', 'value')->getArray());
+
 درج رکورد
 برای درج رکورد جدید:
 
 To insert a new record:
 
-$dbTable->save([
+DBW::save('table_name', [
     'column1' => 'value1',
     'column2' => 'value2'
 ]);
@@ -57,7 +51,7 @@ $dbTable->save([
 
 To update an existing record:
 
-$dbTable->save([
+DBW::save('table_name', [
     'id' => 1,
     'column1' => 'new_value1',
     'column2' => 'new_value2'
@@ -67,4 +61,11 @@ $dbTable->save([
 
 To delete a record:
 
-$dbTable->delete('column_name', 'value');
+DBW::delete('table_name', 'column_name', 'value');
+
+اگر شما به مشکلی برخوردید میتوانید به ایدی زیر در تلگرام پیام دهید 
+
+If you encounter a problem, you can send a message to the following address in Telegram
+
+
+https://t.me/Woodpeacker_dev
