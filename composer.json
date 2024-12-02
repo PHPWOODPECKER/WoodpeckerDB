@@ -1,5 +1,5 @@
 {
-    "name": "woodpeckerDB",
+    "name": "woodpeacker/dbwoodpeacker",
     "description": "A simple and efficient PHP database table handler.",
     "type": "library",
     "require": {
