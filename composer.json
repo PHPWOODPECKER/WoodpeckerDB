@@ -19,6 +19,6 @@
             "email": "derkob.7@gmail.com"
         }
     ],
-    "minimum-stability": "beta",
+    "minimum-stability": "dev-master",
     "prefer-stable": true
 }
