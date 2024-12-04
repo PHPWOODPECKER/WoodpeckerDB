@@ -16,5 +16,6 @@
             "name": "Woodpeacker",
             "email": "derkob.7@gmail.com"
         }
-    ]
+    ],
+    "minimum-stability": "dev"
 }
