@@ -3,7 +3,8 @@
     "description": "A simple and efficient PHP database table handler.",
     "type": "library",
     "require": {
-        "php": "^7.4|^8.0"
+        "php": "^7.4|^8.0",
+        "woodpeacker/dbwoodpeacker": "dev-master"
     },
     "autoload": {
         "psr-4": {
@@ -19,6 +20,6 @@
             "email": "derkob.7@gmail.com"
         }
     ],
-    "minimum-stability": "dev-main",
+    "minimum-stability": "dev",
     "prefer-stable": true
 }
